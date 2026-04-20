@@ -243,7 +243,7 @@ export default function App() {
   };
 
   const defaultNavOrder = ['home', 'about', 'exclusive', 'batches', 'routine', 'downloads', 'join', 'test', 'fee', 'studyhub', 'admin', 'settings'];
-  const isExclusiveAllowed = isVerified || isAdmin || isFaculty;
+  const isExclusiveAllowed = isVerified || isAdmin || isFaculty || !!user;
 
   // Build the effective navigation order
   let effectiveOrder = [...(branding.navOrder || defaultNavOrder)];
@@ -269,14 +269,14 @@ export default function App() {
     switch (activeTab) {
       case 'home': return <TabHome onNavigate={setActiveTab} branding={branding} isDarkMode={isDarkMode} toggleDarkMode={toggleDarkMode} />;
       case 'about': return <TabAbout onNavigate={setActiveTab} />;
-      case 'batches': return <TabBatches />;
+      case 'batches': return <TabBatches isVerified={isVerified} />;
       case 'routine': return <TabRoutine />;
       case 'downloads': return <TabDownloads />;
       case 'library': return <TabResourceVault />;
       case 'whiteboard': return <TabWhiteboard />;
       case 'join': return <TabJoin />;
       case 'test': return <TabTest />;
-      case 'exclusive': return isExclusiveAllowed ? <TabMyBatch userEnrollment={userEnrollment} user={user} facultyBatches={facultyBatches} /> : <TabHome onNavigate={setActiveTab} branding={branding} />;
+      case 'exclusive': return <TabMyBatch userEnrollment={userEnrollment} user={user} facultyBatches={facultyBatches} isVerified={isVerified} />;
       case 'fee': return <TabFee branding={branding} />;
       case 'studyhub': return <TabStudyHub branding={branding} isDarkMode={isDarkMode} toggleDarkMode={toggleDarkMode} />;
       case 'admin': return <TabAdmin branding={branding} />;

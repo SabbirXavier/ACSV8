@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   BookOpen, 
@@ -18,7 +18,8 @@ import {
   Edit2,
   Trash2,
   Upload,
-  X
+  X,
+  CheckCircle2
 } from 'lucide-react';
 import { db } from '../firebase';
 import { collection, onSnapshot, query, where, addDoc, updateDoc, deleteDoc, doc, serverTimestamp } from 'firebase/firestore';
@@ -28,9 +29,10 @@ interface TabMyBatchProps {
   userEnrollment: any;
   user: any;
   facultyBatches: any[];
+  isVerified: boolean;
 }
 
-const TabMyBatch: React.FC<TabMyBatchProps> = ({ userEnrollment, user, facultyBatches }) => {
+const TabMyBatch: React.FC<TabMyBatchProps> = ({ userEnrollment, user, facultyBatches, isVerified }) => {
   const isAdmin = (email: string) => {
     const adminEmail = (import.meta.env.VITE_ADMIN_EMAIL || 'xavierscot3454@gmail.com').toLowerCase();
     const adminEmail1 = (import.meta.env.VITE_ADMIN_EMAIL_1 || 'xavierscot3454@gmail.com').toLowerCase();
@@ -66,9 +68,60 @@ const TabMyBatch: React.FC<TabMyBatchProps> = ({ userEnrollment, user, facultyBa
   const [editingId, setEditingId] = useState<string | null>(null);
   const [formData, setFormData] = useState<any>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [progress, setProgress] = useState<Record<string, any>>({});
+  const [lastCheck, setLastCheck] = useState<number>(() => {
+    const saved = localStorage.getItem(`lms_last_check_${user?.uid}`);
+    return saved ? parseInt(saved) : Date.now() - (7 * 24 * 60 * 60 * 1000); // Default to 7 days ago if new
+  });
 
   const canManageCurrentBatch = isUserAdmin || facultyBatches.some(fb => fb.batchName?.includes(`Class ${activeGrade}`));
   // Note: This logic assumes batch names include "Class XII", etc.
+
+  const isLocked = !isVerified && !isUserAdmin && !isUserFaculty;
+
+  useEffect(() => {
+    if (!user?.uid) return;
+    const qProgress = query(collection(db, `material_progress/${user.uid}/completed`));
+    const unsub = onSnapshot(qProgress, (snap) => {
+      const data: Record<string, any> = {};
+      snap.docs.forEach(doc => data[doc.id] = doc.data());
+      setProgress(data);
+    });
+    return () => unsub();
+  }, [user?.uid]);
+
+  useEffect(() => {
+    // Update last check on dismount or every hour
+    return () => {
+      if (user?.uid) localStorage.setItem(`lms_last_check_${user.uid}`, Date.now().toString());
+    };
+  }, [user?.uid]);
+
+  const markCompleted = useCallback(async (materialId: string) => {
+    if (!user?.uid || isLocked || progress[materialId]?.completed) return;
+    try {
+      await updateDoc(doc(db, `material_progress/${user.uid}/completed`, materialId), {
+        completed: true,
+        completedAt: serverTimestamp()
+      }).catch(async () => {
+        // Try setting if update fails
+        const { setDoc } = await import('firebase/firestore');
+        await setDoc(doc(db, `material_progress/${user.uid}/completed`, materialId), {
+          completed: true,
+          completedAt: serverTimestamp()
+        });
+      });
+      toast.success('Material marked as completed!');
+    } catch (err) {
+      console.error(err);
+    }
+  }, [user?.uid, isLocked, progress]);
+
+  const getProgressPercentage = () => {
+    if (materials.length === 0) return 0;
+    const completedCount = materials.filter(m => progress[m.id]?.completed).length;
+    return Math.round((completedCount / materials.length) * 100);
+  };
 
   useEffect(() => {
     if (isUserAdmin) {
@@ -78,8 +131,13 @@ const TabMyBatch: React.FC<TabMyBatchProps> = ({ userEnrollment, user, facultyBa
       setSubjects(userEnrollment.subjects);
       setActiveSubject(userEnrollment.subjects[0] || '');
       setActiveGrade(userEnrollment.grade || 'XII');
+    } else if (isLocked) {
+      // Provide default subjects for preview for locked/non-enrolled users
+      setSubjects(['PHYSICS', 'CHEMISTRY', 'MATHEMATICS', 'BIOLOGY']);
+      setActiveSubject('PHYSICS');
+      setActiveGrade('XII');
     }
-  }, [userEnrollment, isUserAdmin]);
+  }, [userEnrollment, isUserAdmin, isLocked]);
 
   useEffect(() => {
     if (!activeSubject) return;
@@ -112,7 +170,7 @@ const TabMyBatch: React.FC<TabMyBatchProps> = ({ userEnrollment, user, facultyBa
       unsubFolders();
       unsubMaterials();
     };
-  }, [activeSubject, userEnrollment]);
+  }, [activeSubject, userEnrollment, activeGrade]);
 
   const filteredFolders = folders.filter(f => 
     f.name.toLowerCase().includes(searchQuery.toLowerCase())
@@ -200,68 +258,17 @@ const TabMyBatch: React.FC<TabMyBatchProps> = ({ userEnrollment, user, facultyBa
     };
   }, [viewingMaterial]);
 
-  const MaterialViewer = ({ material, onClose }: { material: any, onClose: () => void }) => (
-    <motion.div 
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      className="fixed inset-0 z-[100] bg-black/95 flex flex-col"
-    >
-      <div className="flex items-center justify-between p-4 bg-white/5 backdrop-blur-xl border-b border-white/10">
-        <div className="flex items-center gap-3">
-          <button onClick={onClose} className="p-2 hover:bg-white/10 rounded-full transition-colors">
-            <ArrowLeft size={24} className="text-white" />
-          </button>
-          <div>
-            <h3 className="text-white font-bold">{material.title}</h3>
-            <p className="text-[10px] text-white/50 font-black uppercase tracking-widest">{material.type} • Protected</p>
-          </div>
-        </div>
-        <div className="flex items-center gap-2 px-3 py-1.5 bg-amber-500/10 text-amber-500 rounded-lg text-[10px] font-black uppercase">
-          <Shield size={14} /> Screen Safe
-        </div>
-      </div>
-      
-      <div className="flex-1 relative overflow-hidden flex items-center justify-center">
-        {material.type === 'pdf' ? (
-          <iframe 
-            src={`${material.url}#toolbar=0&navpanes=0&scrollbar=0`}
-            className="w-full h-full border-none select-none"
-            title={material.title}
-          />
-        ) : material.type === 'video' ? (
-          <div className="w-full h-full max-w-5xl aspect-video relative group">
-             {/* YouTube/Video embed logic here */}
-             <iframe 
-               src={material.url.includes('youtube.com') ? material.url.replace('watch?v=', 'embed/') : material.url}
-               className="w-full h-full border-none rounded-2xl shadow-2xl"
-               allow="autoplay; encrypted-media"
-               allowFullScreen
-             />
-          </div>
-        ) : (
-          <div className="text-center p-8 glass-card">
-            <AlertCircle size={48} className="mx-auto text-amber-500 mb-4" />
-            <h4 className="text-xl font-bold mb-2">Notice</h4>
-            <p className="text-sm opacity-60 mb-6">This content is protected and cannot be previewed here.</p>
-            <a href={material.url} target="_blank" rel="noreferrer" className="px-6 py-2 bg-indigo-600 text-white rounded-xl font-bold">Open Secure Link</a>
-          </div>
-        )}
-
-        {/* Anti-print Overlay */}
-        <div className="absolute inset-0 pointer-events-none opacity-[0.03] select-none flex flex-wrap gap-20 items-center justify-center overflow-hidden">
-           {Array.from({length: 20}).map((_, i) => (
-             <span key={i} className="text-white font-black text-4xl rotate-45 select-none">{userEnrollment?.email}</span>
-           ))}
-        </div>
-      </div>
-    </motion.div>
-  );
-
   return (
     <div className="max-w-7xl mx-auto px-4 py-8 space-y-8 min-h-screen">
       <AnimatePresence>
-        {viewingMaterial && <MaterialViewer material={viewingMaterial} onClose={() => setViewingMaterial(null)} />}
+        {viewingMaterial && (
+          <MaterialViewer 
+            material={viewingMaterial} 
+            user={user}
+            onClose={() => setViewingMaterial(null)} 
+            onComplete={markCompleted}
+          />
+        )}
       </AnimatePresence>
 
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
@@ -271,10 +278,24 @@ const TabMyBatch: React.FC<TabMyBatchProps> = ({ userEnrollment, user, facultyBa
             <span className="text-[10px] font-bold opacity-40 uppercase tracking-widest">LMS Mission Control</span>
           </div>
           <h1 className="text-4xl font-black mb-1">My Batch</h1>
-          <p className="text-sm opacity-50 font-medium italic">
-            {isUserAdmin ? `Administrative Access: Viewing all course materials for Class ${activeGrade}.` : isUserFaculty ? `Faculty Access: Managing materials for assigned batches.` : `Welcome back, ${userEnrollment?.name}. Class ${activeGrade} Materials are ready.`}
-          </p>
-          {(isUserAdmin || isUserFaculty) && (
+          <div className="flex flex-col sm:flex-row sm:items-center gap-4 mt-2">
+            <p className="text-sm opacity-50 font-medium italic">
+              {isUserAdmin ? `Administrative Access: Viewing all course materials for Class ${activeGrade}.` : isUserFaculty ? `Faculty Access: Managing materials for assigned batches.` : isLocked ? `Viewing preview for Class ${activeGrade}. Enroll to unlock all materials.` : `Welcome back, ${userEnrollment?.name}. Class ${activeGrade} Materials are ready.`}
+            </p>
+            {!isLocked && (
+              <div className="flex items-center gap-3 bg-indigo-600/10 border border-indigo-600/20 px-4 py-2 rounded-2xl">
+                <div className="w-20 h-1.5 bg-white/10 rounded-full overflow-hidden">
+                  <motion.div 
+                    initial={{ width: 0 }}
+                    animate={{ width: `${getProgressPercentage()}%` }}
+                    className="h-full bg-indigo-500"
+                  />
+                </div>
+                <span className="text-[10px] font-black text-indigo-500">{getProgressPercentage()}% COMPLETED</span>
+              </div>
+            )}
+          </div>
+          {(isUserAdmin || isUserFaculty || isLocked) && (
             <div className="flex gap-2 mt-4 p-1 bg-white/5 border border-white/5 rounded-xl w-fit">
               {['XII', 'XI', 'X'].map(grade => (
                 <button
@@ -354,15 +375,21 @@ const TabMyBatch: React.FC<TabMyBatchProps> = ({ userEnrollment, user, facultyBa
                         : 'bg-white/5 border-transparent hover:border-white/10 opacity-70 hover:opacity-100'
                     }`}
                   >
-                    <div className="flex items-center gap-4">
-                      <div className={`p-2 rounded-xl ${activeFolder?.id === folder.id ? 'bg-indigo-600 text-white' : 'bg-white/10'}`}>
-                        <BookOpen size={18} />
+                    <div className="text-left flex items-center gap-3">
+                        <div className={`p-2 rounded-xl relative ${activeFolder?.id === folder.id ? 'bg-indigo-600 text-white' : 'bg-white/10'}`}>
+                          <BookOpen size={18} />
+                          {folder.createdAt?.toMillis && folder.createdAt.toMillis() > lastCheck && (
+                            <span className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 border-2 border-[#1a1a1a] rounded-full animate-bounce" title="New Chapter" />
+                          )}
+                        </div>
+                        <div>
+                          <p className="text-sm font-black leading-none mb-1 flex items-center gap-2">
+                            {folder.name}
+                            {isLocked && <Lock size={10} className="opacity-40" />}
+                          </p>
+                          <p className="text-[9px] font-bold opacity-50 uppercase tracking-widest">{activeSubject} Units</p>
+                        </div>
                       </div>
-                      <div className="text-left">
-                        <p className="text-sm font-black leading-none mb-1">{folder.name}</p>
-                        <p className="text-[9px] font-bold opacity-50 uppercase">{activeSubject} Units</p>
-                      </div>
-                    </div>
                     <ChevronRight size={18} className={activeFolder?.id === folder.id ? 'opacity-100' : 'opacity-20'} />
                   </button>
                   {canManageCurrentBatch && (
@@ -495,16 +522,32 @@ const TabMyBatch: React.FC<TabMyBatchProps> = ({ userEnrollment, user, facultyBa
                       </div>
 
                       <div className="flex items-start gap-4">
-                        <div className={`p-4 rounded-2xl ${
+                        <div className={`p-4 rounded-2xl relative ${
                           material.type === 'pdf' ? 'bg-rose-500/10 text-rose-500' :
                           material.type === 'video' ? 'bg-sky-500/10 text-sky-500' :
                           'bg-indigo-500/10 text-indigo-500'
                         }`}>
                           {material.type === 'pdf' ? <FileText size={28} /> : material.type === 'video' ? <Video size={28} /> : <ImageIcon size={28} />}
+                          {material.createdAt?.toMillis && material.createdAt.toMillis() > lastCheck && (
+                            <motion.div 
+                              initial={{ scale: 0 }}
+                              animate={{ scale: 1 }}
+                              className="absolute -top-2 -right-2 bg-red-500 text-white text-[8px] font-black px-1.5 py-0.5 rounded-full shadow-lg z-10"
+                            >
+                              NEW
+                            </motion.div>
+                          )}
                         </div>
                         <div className="flex-1">
-                          <h4 className="font-bold text-lg leading-tight mb-1 group-hover:text-indigo-400 transition-colors">{material.title}</h4>
-                          <p className="text-xs opacity-50 font-medium line-clamp-1">{material.description || 'No description available.'}</p>
+                          <div className="flex items-center gap-2">
+                            <h4 className="font-bold text-lg leading-tight group-hover:text-indigo-400 transition-colors uppercase tracking-tight italic">{material.title}</h4>
+                            {progress[material.id]?.completed && (
+                              <div className="w-5 h-5 rounded-full bg-emerald-500 flex items-center justify-center text-white scale-75 shadow-lg shadow-emerald-500/20">
+                                <CheckCircle2 size={12} />
+                              </div>
+                            )}
+                          </div>
+                          <p className="text-xs opacity-50 font-medium line-clamp-1 mt-0.5">{material.description || 'No description available.'}</p>
                         </div>
                       </div>
 
@@ -512,14 +555,25 @@ const TabMyBatch: React.FC<TabMyBatchProps> = ({ userEnrollment, user, facultyBa
                         <div className="flex items-center gap-4">
                            <div className="flex items-center gap-1.5">
                               <Clock size={12} className="opacity-30" />
-                              <span className="text-[10px] font-bold opacity-40 italic">Added {material.createdAt?.toDate ? material.createdAt.toDate().toLocaleDateString() : 'Now'}</span>
+                              <span className="text-[10px] font-bold opacity-40 italic">Added {material.createdAt?.toDate ? material.createdAt.toDate().toLocaleDateString() : 'Recently'}</span>
                            </div>
                         </div>
                         <button 
-                          onClick={() => setViewingMaterial(material)}
-                          className="px-5 py-2 bg-white/5 hover:bg-indigo-600 hover:text-white rounded-xl text-xs font-black transition-all border border-white/5 hover:border-indigo-600"
+                          onClick={() => {
+                            if (isLocked) {
+                              window.dispatchEvent(new CustomEvent('open-enrollment'));
+                              toast('Please enroll to access this material', { icon: '🔒' });
+                              return;
+                            }
+                            setViewingMaterial(material);
+                          }}
+                          className={`px-5 py-2 rounded-xl text-xs font-black transition-all border flex items-center gap-2 ${
+                            isLocked 
+                              ? 'bg-amber-500/10 text-amber-500 border-amber-500/20 hover:bg-amber-500/20' 
+                              : 'bg-white/5 border-white/5 hover:bg-indigo-600 hover:text-white hover:border-indigo-600'
+                          }`}
                         >
-                          Access Asset
+                          {isLocked ? <><Lock size={12} /> Unlock Asset</> : 'Access Asset'}
                         </button>
                       </div>
                     </div>
@@ -663,6 +717,90 @@ const TabMyBatch: React.FC<TabMyBatchProps> = ({ userEnrollment, user, facultyBa
         </div>
       )}
     </div>
+  );
+};
+
+// Sub-component defined outside to prevent re-renders and iframe flickering
+const MaterialViewer = ({ material, user, onClose, onComplete }: { material: any, user: any, onClose: () => void, onComplete: (id: string) => void }) => {
+  useEffect(() => {
+    if (material.id) onComplete(material.id);
+  }, [material.id, onComplete]);
+
+  return (
+    <motion.div 
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="fixed inset-0 z-[100] bg-black/98 flex flex-col"
+    >
+      <div className="flex items-center justify-between p-4 bg-white/5 backdrop-blur-xl border-b border-white/10">
+        <div className="flex items-center gap-3">
+          <button onClick={onClose} className="p-2 hover:bg-white/10 rounded-full transition-colors">
+            <ArrowLeft size={24} className="text-white" />
+          </button>
+          <div>
+            <h3 className="text-white font-bold">{material.title}</h3>
+            <p className="text-[10px] text-white/50 font-black uppercase tracking-widest">{material.type} • Protected</p>
+          </div>
+        </div>
+        <div className="flex items-center gap-4">
+          <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 bg-emerald-500/10 text-emerald-500 rounded-lg text-[10px] font-black uppercase">
+            <BookOpen size={14} /> Completed
+          </div>
+          <div className="flex items-center gap-2 px-3 py-1.5 bg-amber-500/10 text-amber-500 rounded-lg text-[10px] font-black uppercase">
+            <Shield size={14} /> Screen Safe
+          </div>
+        </div>
+      </div>
+      
+      <div className="flex-1 relative overflow-hidden flex items-center justify-center bg-[#050505]">
+        <div className="w-full h-full p-2 md:p-8 flex items-center justify-center">
+          {material.type === 'pdf' ? (
+            <div className="w-full h-full max-w-6xl rounded-2xl overflow-hidden shadow-2xl relative bg-white/5 border border-white/10">
+              <iframe 
+                src={material.url.includes('drive.google.com') 
+                  ? (material.url.includes('/view') ? material.url.replace('/view', '/preview') : material.url)
+                  : `${material.url}#toolbar=0&navpanes=0&scrollbar=0`
+                }
+                className="w-full h-full border-none select-none"
+                title={material.title}
+                referrerPolicy="no-referrer"
+              />
+            </div>
+          ) : material.type === 'video' ? (
+            <div className="w-full max-w-5xl aspect-video relative rounded-3xl overflow-hidden shadow-2xl shadow-indigo-500/10 border-4 border-white/5 bg-black">
+              {/* Enhanced Video Player */}
+              <iframe 
+                src={material.url.includes('youtube.com') 
+                  ? material.url.replace('watch?v=', 'embed/').split('&')[0] + "?autoplay=1&rel=0&modestbranding=1&controls=1&showinfo=0" 
+                  : material.url}
+                className="w-full h-full border-none"
+                allow="autoplay; encrypted-media; picture-in-picture"
+                allowFullScreen
+                referrerPolicy="no-referrer"
+              />
+            </div>
+          ) : (
+            <div className="max-w-2xl w-full text-center p-12 glass-card border-white/10 relative overflow-hidden">
+              <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-600/10 rounded-full blur-3xl -mr-16 -mt-16"></div>
+              <AlertCircle size={64} className="mx-auto text-amber-500 mb-6 drop-shadow-lg" />
+              <h4 className="text-2xl font-black mb-4">Content Protection Active</h4>
+              <p className="text-gray-400 mb-8 font-medium italic">Your account ({user?.email}) is authorized, but this specific file format requires the external secure viewer.</p>
+              <a href={material.url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 px-8 py-3 bg-[var(--primary)] text-white rounded-2xl font-black uppercase tracking-widest shadow-xl shadow-[var(--primary)]/30 hover:scale-105 active:scale-95 transition-all">
+                Open Secure Portal <ExternalLink size={18} />
+              </a>
+            </div>
+          )}
+        </div>
+
+        {/* Anti-print Overlay */}
+        <div className="absolute inset-0 pointer-events-none opacity-[0.03] select-none flex flex-wrap gap-20 items-center justify-center overflow-hidden">
+           {Array.from({length: 20}).map((_, i) => (
+             <span key={i} className="text-white font-black text-4xl rotate-45 select-none">{user?.email || 'Anonymous'}</span>
+           ))}
+        </div>
+      </div>
+    </motion.div>
   );
 };
 

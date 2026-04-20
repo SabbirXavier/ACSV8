@@ -2,8 +2,9 @@ import React, { useState, useEffect } from 'react';
 import EnrollmentSection from './EnrollmentSection';
 import { firestoreService } from '../services/firestoreService';
 import MarkdownRenderer from './MarkdownRenderer';
+import { Lock } from 'lucide-react';
 
-export default function TabBatches() {
+export default function TabBatches({ isVerified }: { isVerified?: boolean }) {
   const [batches, setBatches] = useState<any[]>([]);
   const [fees, setFees] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -36,8 +37,13 @@ export default function TabBatches() {
           </div>
           <div className="grid gap-4">
             {liveBatches.map(batch => (
-              <div key={batch.id} className="glass-card !border-l-4 !p-5 relative overflow-hidden" style={{ borderLeftColor: batch.color }}>
-                <div className="absolute top-0 right-0 bg-red-500 text-white text-[10px] font-black px-3 py-1 rounded-bl-xl uppercase tracking-tighter">Live</div>
+              <div key={batch.id} className="group glass-card !border-l-4 !p-5 relative overflow-hidden" style={{ borderLeftColor: batch.color }}>
+                <div className="absolute top-0 right-0 bg-red-500 text-white text-[10px] font-black px-3 py-1 rounded-bl-xl uppercase tracking-tighter z-10">Live</div>
+                {!isVerified && (
+                  <div className="absolute top-8 right-0 bg-amber-500 text-white text-[9px] font-black px-2 py-0.5 rounded-bl-lg uppercase flex items-center gap-1 z-10 shadow-lg">
+                    <Lock size={10} /> Locked
+                  </div>
+                )}
                 <div className="flex justify-between items-center mb-1">
                   <b className="tracking-wide" style={{ color: batch.color }}>
                     <MarkdownRenderer content={batch.name} inline />

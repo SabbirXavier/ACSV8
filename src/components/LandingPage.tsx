@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { motion } from 'motion/react';
+import { motion, AnimatePresence } from 'motion/react';
 import { 
   ArrowRight, 
   Zap, 
@@ -16,7 +16,8 @@ import {
   Users,
   Trophy,
   UserCheck,
-  ShieldCheck
+  ShieldCheck,
+  X
 } from 'lucide-react';
 import { landingService, LandingConfig, Achiever, Faculty } from '../services/landingService';
 import { brandingService, BrandingConfig } from '../services/brandingService';
@@ -31,6 +32,7 @@ export default function LandingPage() {
   const [faculty, setFaculty] = useState<Faculty[]>([]);
   const [branding, setBranding] = useState<BrandingConfig | null>(null);
   const [expandedFaculty, setExpandedFaculty] = useState<Record<string, boolean>>({});
+  const [zoomedFaculty, setZoomedFaculty] = useState<Faculty | null>(null);
 
   useEffect(() => {
     const unsubConfig = landingService.listenToConfig(setConfig);
@@ -261,9 +263,17 @@ export default function LandingPage() {
                 >
                   <div className="absolute top-0 right-0 w-24 h-24 bg-[var(--primary)]/5 rounded-full blur-2xl -mr-8 -mt-8 group-hover:bg-[var(--primary)]/10 transition-colors"></div>
                   
-                  <div className="w-28 h-28 rounded-2xl overflow-hidden mb-6 border-2 border-white/10 group-hover:border-[var(--primary)]/50 transition-colors shadow-2xl relative z-10">
+                  <div 
+                    className="w-28 h-28 rounded-2xl overflow-hidden mb-6 border-2 border-white/10 group-hover:border-[var(--primary)]/50 transition-colors shadow-2xl relative z-10 cursor-zoom-in"
+                    onClick={() => setZoomedFaculty(f)}
+                  >
                     {f.photo ? (
-                      <img src={f.photo} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" referrerPolicy="no-referrer" />
+                      <motion.img 
+                        layoutId={`faculty-photo-${f.id}`}
+                        src={f.photo} 
+                        className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" 
+                        referrerPolicy="no-referrer" 
+                      />
                     ) : (
                       <div className="w-full h-full bg-white/10 flex items-center justify-center text-gray-500">
                         <Users size={40} />
@@ -325,6 +335,53 @@ export default function LandingPage() {
           © 2026 Advanced Classes. All rights reserved.
         </p>
       </footer>
+
+      {/* Zoom Modal */}
+      <AnimatePresence>
+        {zoomedFaculty && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => setZoomedFaculty(null)}
+            className="fixed inset-0 z-[100] bg-black/90 backdrop-blur-md flex items-center justify-center p-6 cursor-zoom-out"
+          >
+            <motion.div 
+              initial={{ scale: 0.8, y: 20 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 0.8, y: 20 }}
+              className="relative max-w-2xl w-full flex flex-col items-center"
+              onClick={e => e.stopPropagation()}
+            >
+              <motion.div 
+                layoutId={`faculty-photo-${zoomedFaculty.id}`}
+                className="w-64 h-64 md:w-96 md:h-96 rounded-3xl overflow-hidden shadow-2xl border-4 border-white/10 mb-8"
+              >
+                <img 
+                  src={zoomedFaculty.photo} 
+                  alt={zoomedFaculty.name} 
+                  className="w-full h-full object-cover" 
+                  referrerPolicy="no-referrer"
+                />
+              </motion.div>
+              <div className="text-center space-y-4">
+                <h3 className="text-4xl font-black text-[var(--primary)] uppercase italic leading-none">{zoomedFaculty.name}</h3>
+                <div className="inline-block px-4 py-2 bg-[var(--primary)]/10 rounded-full">
+                  <p className="text-sm text-[var(--primary)] font-black uppercase tracking-widest">{zoomedFaculty.degree}</p>
+                </div>
+                <p className="text-gray-400 font-medium max-w-lg mx-auto leading-relaxed">{zoomedFaculty.achievement}</p>
+                <div className="text-xs font-black text-gray-500 uppercase tracking-[0.2em]">{zoomedFaculty.experience} Excellence</div>
+              </div>
+              <button 
+                onClick={() => setZoomedFaculty(null)}
+                className="absolute -top-12 right-0 p-2 text-white/50 hover:text-white transition-colors"
+              >
+                <X size={32} />
+              </button>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

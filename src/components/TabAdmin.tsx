@@ -114,12 +114,14 @@ export default function TabAdmin({ branding }: { branding?: any }) {
     if (isLoggedIn && user && routines.length > 0) {
       const runSyncAndCleanup = async () => {
         const kolkataNow = getKolkataTime();
+        const realNow = new Date(); // Absolute system time for sync interval check
         const today = kolkataNow.toLocaleDateString('en-US', { weekday: 'short' }).toLowerCase();
         const todayDateStr = kolkataNow.toDateString();
+        const kolkataMidnight = new Date(kolkataNow.toDateString());
         
         // 1. Sync new radars for today (Check if interval elapsed or manual sync needed)
         const lastSync = radarConfig.lastSyncAt?.toDate?.() || new Date(0);
-        const diffMs = kolkataNow.getTime() - lastSync.getTime();
+        const diffMs = realNow.getTime() - lastSync.getTime();
         const intervalMs = radarConfig.syncIntervalMinutes * 60000;
 
         if (radarConfig.autoSyncEnabled && diffMs >= intervalMs) {
@@ -153,12 +155,12 @@ export default function TabAdmin({ branding }: { branding?: any }) {
           }
         }
 
-        // 2. Cleanup expired radars (Auto-delete when class is over)
-        const parseTime = (timeStr: string) => {
+        // 2. Cleanup expired radars (Auto-delete when class is over or from previous days)
+        const parseTimeStr = (timeStr: string) => {
           if (!timeStr) return null;
           try {
-            const startTimeStr = timeStr.split('-')[0].trim();
-            const timeMatch = startTimeStr.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)?$/i);
+            const cleanTime = timeStr.split('-')[0].trim();
+            const timeMatch = cleanTime.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)?$/i);
             if (!timeMatch) return null;
 
             let hours = parseInt(timeMatch[1], 10);
@@ -175,15 +177,24 @@ export default function TabAdmin({ branding }: { branding?: any }) {
         };
 
         for (const rad of radars) {
-          if (rad.date === todayDateStr && rad.endTime) {
-            const end = parseTime(rad.endTime);
-            if (end && kolkataNow > end) {
-              try {
+          try {
+            const radDate = new Date(rad.date);
+            
+            // Check if it's from a previous day
+            if (radDate < kolkataMidnight) {
+              await firestoreService.deleteItem('radars', rad.id);
+              continue;
+            }
+
+            // If it's today, check if it's expired
+            if (rad.date === todayDateStr && rad.endTime) {
+              const end = parseTimeStr(rad.endTime);
+              if (end && kolkataNow > end) {
                 await firestoreService.deleteItem('radars', rad.id);
-              } catch (e) {
-                console.error("Auto-cleanup failed:", e);
               }
             }
+          } catch (e) {
+            console.error("Auto-cleanup failed for radar:", rad.id, e);
           }
         }
 
@@ -206,7 +217,7 @@ export default function TabAdmin({ branding }: { branding?: any }) {
       runSyncAndCleanup();
       return () => clearInterval(interval);
     }
-  }, [isLoggedIn, user, routines, radars]);
+  }, [isLoggedIn, user, routines, radars, radarConfig]);
 
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -1218,7 +1229,7 @@ export default function TabAdmin({ branding }: { branding?: any }) {
                             </div>
                             <button 
                               onClick={() => {
-                                updateItem('chatUsers', u.id, { ...u, status: 'active', isMuted: false, cooldownUntil: null, muteUntil: null }, true);
+                                updateItem('users', u.id, { ...u, status: 'active', isMuted: false, cooldownUntil: null, muteUntil: null }, true);
                                 toast.success(`Removed restrictions for ${u.name}`);
                               }}
                               className="text-xs bg-white dark:bg-[#111] border border-gray-200 dark:border-white/10 px-3 py-1.5 rounded hover:bg-gray-100 dark:hover:bg-white/20 transition-colors mt-1"
@@ -1312,7 +1323,7 @@ export default function TabAdmin({ branding }: { branding?: any }) {
                     <select 
                       className="flex-1 md:w-32 p-2 bg-white/5 border border-[var(--border-color)] rounded-lg text-sm [&>option]:bg-white dark:[&>option]:bg-gray-900 [&>option]:text-gray-900 dark:[&>option]:text-white"
                       value={user.role}
-                      onChange={(e) => updateItem('chatUsers', user.id, { ...user, role: e.target.value })}
+                      onChange={(e) => updateItem('users', user.id, { ...user, role: e.target.value })}
                     >
                       <option value="student">Student</option>
                       <option value="faculty">Faculty</option>
@@ -1322,7 +1333,7 @@ export default function TabAdmin({ branding }: { branding?: any }) {
                     <select 
                       className="flex-1 md:w-32 p-2 bg-white/5 border border-[var(--border-color)] rounded-lg text-sm [&>option]:bg-white dark:[&>option]:bg-gray-900 [&>option]:text-gray-900 dark:[&>option]:text-white"
                       value={user.status}
-                      onChange={(e) => updateItem('chatUsers', user.id, { ...user, status: e.target.value })}
+                      onChange={(e) => updateItem('users', user.id, { ...user, status: e.target.value })}
                     >
                       <option value="active">Active</option>
                       <option value="muted">Muted</option>
@@ -1807,7 +1818,7 @@ export default function TabAdmin({ branding }: { branding?: any }) {
                                 });
                                 // Automatically upgrade role to Faculty if not admin
                                 if (targetUser.role !== 'admin') {
-                                  await updateItem('chatUsers', userId, { ...targetUser, role: 'faculty' });
+                                  await updateItem('users', userId, { ...targetUser, role: 'faculty' });
                                 }
                                 toast.success('Faculty access granted');
                               }
@@ -1984,7 +1995,7 @@ export default function TabAdmin({ branding }: { branding?: any }) {
                                           <button onClick={() => openEditModal('course_folders', folder)} className="p-1 hover:text-indigo-500 transition-colors">
                                             <Edit2 size={12} />
                                           </button>
-                                          <button onClick={() => confirm(`Delete ${folder.name}?`) && deleteItem('course_folders', folder.id)} className="p-1 hover:text-red-500 transition-colors">
+                                          <button onClick={() => window.confirm(`Delete ${folder.name}?`) && deleteItem('course_folders', folder.id)} className="p-1 hover:text-red-500 transition-colors">
                                             <Trash2 size={12} />
                                           </button>
                                         </div>
@@ -2025,7 +2036,7 @@ export default function TabAdmin({ branding }: { branding?: any }) {
                                         <button onClick={() => openEditModal('course_folders', folder)} className="p-1 hover:text-amber-500 transition-colors">
                                           <Edit2 size={12} />
                                         </button>
-                                        <button onClick={() => confirm(`Delete ${folder.name}?`) && deleteItem('course_folders', folder.id)} className="p-1 hover:text-red-500 transition-colors">
+                                        <button onClick={() => window.confirm(`Delete ${folder.name}?`) && deleteItem('course_folders', folder.id)} className="p-1 hover:text-red-500 transition-colors">
                                           <Trash2 size={12} />
                                         </button>
                                       </div>

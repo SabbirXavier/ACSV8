@@ -167,6 +167,10 @@ service cloud.firestore {
     match /resources/{id} { allow read: if true; allow write: if isAdmin(); }
     match /announcements/{id} { allow read: if true; allow write: if isAdmin(); }
 
+    match /exclusive_content/{id} { allow read: if true; allow write: if isAdmin(); }
+    match /course_folders/{id} { allow read: if true; allow write: if isAdmin(); }
+    match /batchFaculty/{id} { allow read: if true; allow write: if isAdmin(); }
+    match /socialLinks/{id} { allow read: if true; allow write: if isAdmin(); }
     match /admin/storage/projects/{projectId} {
       allow read, write: if isAdmin();
     }
