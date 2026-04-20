@@ -122,7 +122,7 @@ export default function LandingPage() {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               transition={{ delay: 0.2 }}
-              className="text-lg md:text-xl text-gray-400 max-w-2xl font-medium"
+              className="text-lg md:text-xl text-gray-400 max-w-2xl font-medium whitespace-pre-wrap"
             >
               {config.heroSubtitle}
             </motion.p>
@@ -294,11 +294,26 @@ export default function LandingPage() {
                         <Star size={12} className="text-yellow-500 fill-current" />
                         {f.experience} Experience
                       </div>
-                      {f.achievement && (
-                        <div className="flex flex-col items-center justify-center gap-2 text-xs text-gray-400 font-semibold italic bg-white/5 py-2 px-4 rounded-xl">
-                          <div className="flex items-center gap-2">
-                            <Trophy size={14} className="text-[var(--primary)] shrink-0" />
-                            <span className={expandedFaculty[f.id] ? "" : "line-clamp-2"}>{f.achievement}</span>
+                        <div className="flex flex-col items-center justify-center gap-2 text-xs text-gray-400 font-semibold italic bg-white/5 py-2 px-4 rounded-xl w-full">
+                          <div className="flex flex-col gap-2 w-full">
+                            <div className="flex items-center gap-2 justify-center">
+                              <Trophy size={14} className="text-[var(--primary)] shrink-0" />
+                              <span className="font-black uppercase tracking-widest text-[var(--primary)]">Key Achievements</span>
+                            </div>
+                            <div className={`space-y-1 text-left ${expandedFaculty[f.id] ? "" : "line-clamp-3"}`}>
+                              {f.achievement.split('\n').map((line, i) => (
+                                <div key={i} className="flex gap-2 items-start text-[10px] leading-relaxed">
+                                  {line.trim().startsWith('*') ? (
+                                    <>
+                                      <CheckCircle2 size={10} className="text-[var(--primary)] shrink-0 mt-1" />
+                                      <span>{line.replace('*', '').trim()}</span>
+                                    </>
+                                  ) : (
+                                    <span className="italic">{line}</span>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
                           </div>
                           {f.achievement.length > 60 && (
                             <button 
@@ -309,7 +324,6 @@ export default function LandingPage() {
                             </button>
                           )}
                         </div>
-                      )}
                     </div>
                   </div>
                 </motion.div>
@@ -369,7 +383,7 @@ export default function LandingPage() {
                 <div className="inline-block px-4 py-2 bg-[var(--primary)]/10 rounded-full">
                   <p className="text-sm text-[var(--primary)] font-black uppercase tracking-widest">{zoomedFaculty.degree}</p>
                 </div>
-                <p className="text-gray-400 font-medium max-w-lg mx-auto leading-relaxed">{zoomedFaculty.achievement}</p>
+                <p className="text-gray-400 font-medium max-w-lg mx-auto leading-relaxed whitespace-pre-wrap text-center">{zoomedFaculty.achievement}</p>
                 <div className="text-xs font-black text-gray-500 uppercase tracking-[0.2em]">{zoomedFaculty.experience} Excellence</div>
               </div>
               <button 

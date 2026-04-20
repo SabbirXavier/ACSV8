@@ -16,8 +16,10 @@ import {
   User,
   X,
   MicOff,
-  ShieldAlert
+  ShieldAlert,
+  Clock
 } from 'lucide-react';
+import toast from 'react-hot-toast';
 import { motion, AnimatePresence } from 'motion/react';
 import { authService, UserProfile } from '../services/authService';
 import { channelService, Channel, hasPermission } from '../services/channelService';
@@ -427,27 +429,47 @@ export default function TabStudyHub({ branding, isDarkMode, toggleDarkMode }: Ta
                   })()}
 
                   <div className="flex gap-2">
-                    {userData?.role === 'admin' && selectedProfileData.uid !== user?.uid && (() => {
-                      const isMuted = selectedProfileData.isMuted;
-                      const hasCooldown = selectedProfileData.cooldownUntil && (selectedProfileData.cooldownUntil.toMillis ? selectedProfileData.cooldownUntil.toMillis() : (selectedProfileData.cooldownUntil.seconds * 1000)) > Date.now();
-                      const isRestricted = isMuted || hasCooldown;
-
-                      return (
+                    {userData?.role === 'admin' && selectedProfileData.uid !== user?.uid && (
+                      <div className="flex flex-col gap-2 w-full">
+                        <div className="flex gap-2">
+                          <button 
+                            onClick={() => {
+                              if (selectedProfileData.isMuted) chatService.unmuteUser(selectedProfileData.uid);
+                              else chatService.muteUser(selectedProfileData.uid);
+                            }}
+                            className={`flex-1 p-3 rounded-xl font-bold transition-all flex items-center justify-center gap-2 text-xs ${selectedProfileData.isMuted ? 'bg-green-500 text-white' : 'bg-orange-500 text-white'}`}
+                          >
+                            {selectedProfileData.isMuted ? <ShieldAlert size={16} className="rotate-180" /> : <MicOff size={16} />}
+                            {selectedProfileData.isMuted ? 'Unmute' : 'Mute'}
+                          </button>
+                          <button 
+                            onClick={() => {
+                              const duration = prompt('Timeout duration in seconds (e.g. 60 for 1 min):', '60');
+                              if (duration) chatService.setCooldown(selectedProfileData.uid, parseInt(duration));
+                            }}
+                            className="flex-1 p-3 bg-red-500/10 text-red-500 rounded-xl font-bold text-xs flex items-center justify-center gap-2"
+                          >
+                            <Clock size={16} /> Timeout
+                          </button>
+                        </div>
                         <button 
-                          onClick={() => {
-                            if (isRestricted) chatService.unmuteUser(selectedProfileData.uid);
-                            else chatService.muteUser(selectedProfileData.uid);
+                          onClick={async () => {
+                            const startDate = prompt('Start Date (YYYY-MM-DD):', new Date().toISOString().split('T')[0]);
+                            const endDate = prompt('End Date (YYYY-MM-DD):', new Date(Date.now() + 86400000).toISOString().split('T')[0]);
+                            if (startDate && endDate && confirm('Delete all messages in this range?')) {
+                              await chatService.deleteMessagesByRange(activeChannel, new Date(startDate), new Date(endDate));
+                              toast.success('Messages deleted');
+                            }
                           }}
-                          className={`flex-1 p-4 rounded-2xl font-bold transition-all flex items-center justify-center gap-2 ${isRestricted ? 'bg-green-500 text-white shadow-lg shadow-green-500/20' : 'bg-orange-500 text-white shadow-lg shadow-orange-500/20'}`}
+                          className="w-full p-3 bg-red-500 text-white rounded-xl font-bold text-xs flex items-center justify-center gap-2"
                         >
-                          {isRestricted ? <ShieldAlert size={18} className="rotate-180" /> : <MicOff size={18} />}
-                          {isRestricted ? 'Unmute / Clear' : 'Mute User'}
+                          <X size={16} /> Delete By Date Range
                         </button>
-                      );
-                    })()}
+                      </div>
+                    )}
                     <button 
                       onClick={() => setSelectedProfileId(null)}
-                      className={`${userData?.role === 'admin' && selectedProfileData.uid !== user?.uid ? 'flex-1' : 'w-full'} p-4 bg-gray-100 dark:bg-white/5 rounded-2xl font-bold hover:bg-gray-200 dark:hover:bg-white/10 transition-all`}
+                      className={`${(userData?.role === 'admin' || userData?.role === 'moderator') && selectedProfileData.uid !== user?.uid ? 'w-full mt-2' : 'w-full'} p-4 bg-gray-100 dark:bg-white/5 rounded-2xl font-bold hover:bg-gray-200 dark:hover:bg-white/10 transition-all`}
                     >
                       Close
                     </button>

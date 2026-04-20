@@ -241,7 +241,23 @@ export const chatService = {
   },
 
   async updateChannel(channelId: string, updates: any) {
-    const channelRef = doc(db, 'channels', channelId);
+    const channelRef = doc(db, 'channels_config', channelId);
     await updateDoc(channelRef, updates);
+  },
+
+  async deleteMessagesByRange(channelId: string, startDate: Date, endDate: Date) {
+    const messagesRef = collection(db, 'channels', channelId, 'messages');
+    const q = query(
+      messagesRef, 
+      where('createdAt', '>=', Timestamp.fromDate(startDate)),
+      where('createdAt', '<=', Timestamp.fromDate(endDate))
+    );
+    const snapshot = await getDocs(q);
+    
+    // Process in batches (Firestore limit 500 per batch but let's just do sequential for simplicity in this volume)
+    const promises = snapshot.docs.map(docSnap => 
+      updateDoc(docSnap.ref, { isDeleted: true, content: 'Message removed by moderator', updatedAt: serverTimestamp() })
+    );
+    await Promise.all(promises);
   }
 };

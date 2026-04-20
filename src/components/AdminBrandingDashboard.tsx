@@ -12,7 +12,8 @@ import {
   CreditCard,
   QrCode,
   Star,
-  Settings
+  Settings,
+  Shield
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { brandingService, BrandingConfig } from '../services/brandingService';
@@ -200,21 +201,38 @@ export default function AdminBrandingDashboard() {
                 className="w-full p-3 bg-gray-100 dark:bg-white/5 border border-transparent focus:border-[var(--primary)] rounded-xl outline-none transition-all text-sm font-mono"
                 placeholder="home, batches, routine, test, downloads, studyhub, fee, join, settings"
               />
-              <p className="text-[10px] text-gray-500">Available: home, about, batches, routine, downloads, join, test, fee, studyhub, admin, settings</p>
+              <p className="text-[10px] text-gray-500">Available: home, about, exclusive, batches, routine, downloads, join, test, fee, studyhub, admin, settings</p>
             </div>
 
-            <div className="space-y-2">
-              <label className="text-sm font-bold flex items-center gap-2">
-                <Settings size={16} className="text-gray-400" />
-                Meta Pixel Code (Ads Retargeting)
-              </label>
-              <textarea 
-                value={config.metaPixelCode || ''}
-                onChange={e => setConfig({ ...config, metaPixelCode: e.target.value })}
-                className="w-full p-3 bg-gray-100 dark:bg-white/5 border border-transparent focus:border-[var(--primary)] rounded-xl outline-none transition-all text-sm font-mono min-h-[120px]"
-                placeholder="Paste your Meta Pixel code here (including <script> tags)..."
-              />
-              <p className="text-[10px] text-gray-500">This code will be injected into the website header for all users.</p>
+            <div className="space-y-4 pt-4 border-t border-gray-100 dark:border-white/5">
+              <h4 className="text-xs font-black uppercase tracking-widest text-gray-400">Advanced Analytics</h4>
+              
+              <div className="space-y-2">
+                <label className="text-sm font-bold flex items-center gap-2">
+                  <Shield size={16} className="text-indigo-500" />
+                  Google Analytics Code
+                </label>
+                <textarea 
+                  value={config.googleAnalyticsCode || ''}
+                  onChange={e => setConfig({ ...config, googleAnalyticsCode: e.target.value })}
+                  className="w-full p-3 bg-gray-100 dark:bg-white/5 border border-transparent focus:border-indigo-500 rounded-xl outline-none transition-all text-sm font-mono min-h-[100px]"
+                  placeholder="Paste your Google Analytics tracking code here..."
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-sm font-bold flex items-center gap-2">
+                  <Settings size={16} className="text-gray-400" />
+                  Meta Pixel Code (Ads Retargeting)
+                </label>
+                <textarea 
+                  value={config.metaPixelCode || ''}
+                  onChange={e => setConfig({ ...config, metaPixelCode: e.target.value })}
+                  className="w-full p-3 bg-gray-100 dark:bg-white/5 border border-transparent focus:border-[var(--primary)] rounded-xl outline-none transition-all text-sm font-mono min-h-[100px]"
+                  placeholder="Paste your Meta Pixel code here (including <script> tags)..."
+                />
+                <p className="text-[10px] text-gray-500">Analytics and Tracking codes will be injected into the website header for all users.</p>
+              </div>
             </div>
 
             <div className="pt-4 flex items-center gap-4">

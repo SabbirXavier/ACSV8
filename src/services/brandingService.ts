@@ -14,6 +14,7 @@ export interface BrandingConfig {
   upiId?: string;
   starTitle?: string;
   metaPixelCode?: string;
+  googleAnalyticsCode?: string;
   navOrder?: string[];
   updatedAt: any;
 }
@@ -25,7 +26,8 @@ const DEFAULT_BRANDING: BrandingConfig = {
   upiId: 'advancedclasses@boi',
   starTitle: 'STAR OF THE WEEK',
   metaPixelCode: '',
-  navOrder: ['home', 'batches', 'routine', 'test', 'downloads', 'studyhub', 'fee', 'join', 'settings'],
+  googleAnalyticsCode: '',
+  navOrder: ['home', 'exclusive', 'batches', 'routine', 'test', 'downloads', 'studyhub', 'fee', 'join', 'settings'],
   updatedAt: null
 };
 

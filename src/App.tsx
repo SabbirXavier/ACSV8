@@ -56,8 +56,8 @@ export default function App() {
     return e === adminEmail || e === adminEmail1 || e === adminEmail2 || e === adminEmail3;
   };
 
-  const isAdmin = userData?.role === 'admin' || isRootAdmin(user?.email);
-  const isFaculty = userData?.role === 'faculty' || (facultyBatches && facultyBatches.length > 0);
+  const isSystemAdmin = userData?.role === 'admin' || isRootAdmin(user?.email);
+  const isSystemFaculty = userData?.role === 'faculty' || (facultyBatches && facultyBatches.length > 0);
 
   useEffect(() => {
     // Sync landing page state on mount and popstate
@@ -242,14 +242,38 @@ export default function App() {
     settings: { icon: <Settings size={22} />, label: "Settings", isActive: (t) => t === 'settings' }
   };
 
-  const defaultNavOrder = ['home', 'about', 'exclusive', 'batches', 'routine', 'downloads', 'join', 'test', 'fee', 'studyhub', 'admin', 'settings'];
-  const isExclusiveAllowed = isVerified || isAdmin || isFaculty || !!user;
+  const isUserAdmin = isSystemAdmin;
 
+  const defaultNavOrder = ['home', 'about', 'exclusive', 'batches', 'routine', 'downloads', 'join', 'test', 'fee', 'studyhub', 'admin', 'settings'];
+  const hasExclusivePermission = isVerified || isUserAdmin || isSystemFaculty || !!user;
+
+  // Map branding nav order names to internal names
+  // User might type "mybatch" for "exclusive"
+  const navMap: Record<string, string> = {
+    'home': 'home',
+    'about': 'about',
+    'batches': 'batches',
+    'routine': 'routine',
+    'downloads': 'downloads',
+    'join': 'join',
+    'test': 'test',
+    'fee': 'fee',
+    'studyhub': 'studyhub',
+    'admin': 'admin',
+    'settings': 'settings',
+    'mybatch': 'exclusive',
+    'mybatches': 'exclusive',
+    'exclusive': 'exclusive'
+  };
+
+  const brandingOrder = branding.navOrder || defaultNavOrder;
+  const mappedOrder = brandingOrder.map(k => navMap[k.toLowerCase()] || k).filter(Boolean);
+  
   // Build the effective navigation order
-  let effectiveOrder = [...(branding.navOrder || defaultNavOrder)];
+  let effectiveOrder = Array.from(new Set([...mappedOrder, ...defaultNavOrder]));
   
   // If "exclusive" is allowed but missing from the pool, inject it
-  if (isExclusiveAllowed && !effectiveOrder.includes('exclusive')) {
+  if (hasExclusivePermission && !effectiveOrder.includes('exclusive')) {
     const batchesIdx = effectiveOrder.indexOf('batches');
     const homeIdx = effectiveOrder.indexOf('home');
     const insertPos = batchesIdx !== -1 ? batchesIdx : (homeIdx !== -1 ? homeIdx + 1 : 0);
@@ -257,8 +281,8 @@ export default function App() {
   }
 
   const currentNavOrder = effectiveOrder.filter(id => {
-    if (id === 'exclusive') return isExclusiveAllowed;
-    if (id === 'admin') return isAdmin;
+    if (id === 'exclusive') return hasExclusivePermission;
+    if (id === 'admin') return isUserAdmin;
     // Filter out if not in config
     return !!navItemsConfig[id];
   });

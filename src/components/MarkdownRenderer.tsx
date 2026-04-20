@@ -55,6 +55,26 @@ const CodeBlock = ({ language, value }: { language: string; value: string }) => 
 export default function MarkdownRenderer({ content, className = '', inline = false }: MarkdownRendererProps) {
   const Component = inline ? 'span' : 'div';
   
+  // Auto-LaTeX: wrap common math patterns in $ if they aren't already
+  const processedContent = React.useMemo(() => {
+    if (!content) return '';
+    // Detect patterns like \frac, \sqrt, x^2, etc. that aren't wrapped in $
+    let text = content;
+    
+    // Heuristic: if it looks like LaTeX but lacks $, wrap it.
+    const mathKeywords = /\\(frac|sqrt|sum|prod|lim|int|pm|times|div|cup|cap|subset|subseteq|in|notin|deg|sin|cos|tan|log|ln|text)/g;
+    
+    if (mathKeywords.test(text) && !text.includes('$')) {
+      return `$${text}$`;
+    }
+    
+    if (text.includes('^') && !text.includes('$') && text.length < 50) {
+       return `$${text}$`;
+    }
+
+    return text;
+  }, [content]);
+
   const components: any = {
     // Ensure links open in new tab
     a: ({ node, ...props }: any) => <a {...props} target="_blank" rel="noopener noreferrer" />,
@@ -92,7 +112,7 @@ export default function MarkdownRenderer({ content, className = '', inline = fal
         rehypePlugins={[rehypeRaw, rehypeKatex]}
         components={components}
       >
-        {content}
+        {processedContent}
       </ReactMarkdown>
     </Component>
   );

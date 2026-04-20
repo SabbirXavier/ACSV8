@@ -17,7 +17,8 @@ export interface UserProfile {
   name: string;
   email: string;
   photoUrl: string;
-  role: 'student' | 'admin' | 'moderator';
+  role: 'student' | 'admin' | 'moderator' | 'faculty';
+  roles?: string[]; // Support multiple roles
   bio?: string;
   school?: string;
   town?: string;
@@ -60,6 +61,7 @@ export const authService = {
         email: user.email || '',
         photoUrl: user.photoURL || '',
         role: isRootAdmin ? 'admin' : 'student',
+        roles: isRootAdmin ? ['admin', 'student'] : ['student'],
         createdAt: serverTimestamp(),
         status: 'online',
         lastSeen: serverTimestamp()
@@ -70,13 +72,17 @@ export const authService = {
       
       if (isRootAdmin && profile.role !== 'admin') {
         profile.role = 'admin';
+        if (!profile.roles?.includes('admin')) {
+          profile.roles = [...(profile.roles || []), 'admin'];
+        }
       }
       
       // Update last seen and status
       await setDoc(userRef, { 
         status: 'online', 
         lastSeen: serverTimestamp(),
-        role: profile.role
+        role: profile.role,
+        roles: profile.roles || [profile.role]
       }, { merge: true });
     }
     

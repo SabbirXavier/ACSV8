@@ -2,9 +2,11 @@ import React, { useState, useEffect, useRef } from 'react';
 import AdminStorageDashboard from './AdminStorageDashboard';
 import AdminBrandingDashboard from './AdminBrandingDashboard';
 import AdminLandingDashboard from './AdminLandingDashboard';
+import SearchableUserDropdown from './SearchableUserDropdown';
 import { channelService, Channel } from '../services/channelService';
 import { authService } from '../services/authService';
-import { Settings, Shield, ShieldAlert, Layers, User, Users, BookOpen, Calendar, Download, DollarSign, Database, Palette, MessageSquare, Menu, X, ChevronRight, FileDown, Radio, Brain, Zap, Star, Wallet, Clock, Trash2, Loader2, RefreshCw, Upload, Link as LinkIcon, Instagram, Facebook, Youtube, Twitter, Send, MessageCircle, Edit, Edit2, Layout, Plus, Library, FileText, Video, ExternalLink, Image as ImageIcon } from 'lucide-react';
+import FinanceModule from './FinanceModule';
+import { Settings, Shield, ShieldAlert, Layers, User, Users, BookOpen, Calendar, Download, DollarSign, Database, Palette, MessageSquare, Menu, X, ChevronRight, FileDown, Radio, Brain, Zap, Star, Wallet, Clock, Trash2, Loader2, RefreshCw, Upload, Link as LinkIcon, Instagram, Facebook, Youtube, Twitter, Send, MessageCircle, Edit, Edit2, Layout, Plus, Library, FileText, Video, ExternalLink, Image as ImageIcon, Search, UserPlus } from 'lucide-react';
 import { doc, onSnapshot, updateDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { firestoreService } from '../services/firestoreService';
@@ -588,7 +590,8 @@ export default function TabAdmin({ branding }: { branding?: any }) {
     { id: 'faculty', label: 'Faculty Access', icon: ShieldAlert },
     { id: 'routines', label: 'Routines', icon: Calendar },
     { id: 'downloads', label: 'Downloads', icon: Download },
-    { id: 'fees', label: 'Fees', icon: DollarSign },
+    { id: 'finances', label: 'Finances', icon: DollarSign },
+    { id: 'fees', label: 'Student Fees', icon: DollarSign },
     { id: 'users', label: 'Users', icon: Users },
     { id: 'storage', label: 'Storage', icon: Database },
     { id: 'branding', label: 'Branding', icon: Palette },
@@ -978,6 +981,10 @@ export default function TabAdmin({ branding }: { branding?: any }) {
           </div>
         )}
 
+        {activeSection === 'finances' && (
+          <FinanceModule />
+        )}
+
         {activeSection === 'chatroom' && (
           <div className="space-y-6">
             <div className="flex justify-between items-center">
@@ -1287,13 +1294,16 @@ export default function TabAdmin({ branding }: { branding?: any }) {
           <div className="space-y-6">
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
               <h3 className="text-xl font-bold text-[var(--primary)]">User Management</h3>
-              <input 
-                type="text" 
-                placeholder="Search users by name or email..." 
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full sm:w-64 p-2 bg-white/5 border border-[var(--border-color)] rounded-lg focus:outline-none focus:border-[var(--primary)]"
-              />
+              <div className="relative w-full sm:w-72">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
+                <input 
+                  type="text" 
+                  placeholder="Search users by name or email..." 
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full pl-10 pr-4 py-2.5 bg-white/5 border border-white/10 rounded-xl focus:outline-none focus:border-[var(--primary)]/50 transition-all text-sm font-medium"
+                />
+              </div>
             </div>
             <div className="space-y-4">
               {chatUsers.filter(u => 
@@ -1319,17 +1329,37 @@ export default function TabAdmin({ branding }: { branding?: any }) {
                       </div>
                     </div>
                   </div>
-                  <div className="flex gap-3 w-full md:w-auto">
-                    <select 
-                      className="flex-1 md:w-32 p-2 bg-white/5 border border-[var(--border-color)] rounded-lg text-sm [&>option]:bg-white dark:[&>option]:bg-gray-900 [&>option]:text-gray-900 dark:[&>option]:text-white"
-                      value={user.role}
-                      onChange={(e) => updateItem('users', user.id, { ...user, role: e.target.value })}
-                    >
-                      <option value="student">Student</option>
-                      <option value="faculty">Faculty</option>
-                      <option value="moderator">Moderator</option>
-                      <option value="admin">Admin</option>
-                    </select>
+                  <div className="flex flex-col gap-3 w-full md:w-auto">
+                    <div className="flex flex-wrap gap-2">
+                      {['student', 'faculty', 'moderator', 'admin'].map(r => {
+                        const roles = user.roles || [user.role || 'student'];
+                        const hasRole = roles.includes(r);
+                        return (
+                          <button
+                            key={r}
+                            onClick={() => {
+                              const newRoles = hasRole 
+                                ? roles.filter(role => role !== r)
+                                : [...roles, r];
+                              // Ensure at least one role
+                              if (newRoles.length === 0) return;
+                              updateItem('users', user.id, { 
+                                ...user, 
+                                role: newRoles[0], // fallback for legacy
+                                roles: newRoles 
+                              });
+                            }}
+                            className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${
+                              hasRole 
+                                ? 'bg-indigo-500 text-white shadow-lg shadow-indigo-500/20' 
+                                : 'bg-white/5 text-gray-500 border border-white/10 hover:border-white/20'
+                            }`}
+                          >
+                            {r}
+                          </button>
+                        );
+                      })}
+                    </div>
                     <select 
                       className="flex-1 md:w-32 p-2 bg-white/5 border border-[var(--border-color)] rounded-lg text-sm [&>option]:bg-white dark:[&>option]:bg-gray-900 [&>option]:text-gray-900 dark:[&>option]:text-white"
                       value={user.status}
@@ -1351,17 +1381,39 @@ export default function TabAdmin({ branding }: { branding?: any }) {
 
         {activeSection === 'enrollments' && (
           <div className="space-y-6">
-            <div className="flex justify-between items-center">
-              <h3 className="text-xl font-bold text-[var(--primary)]">Enrollments</h3>
-              <button 
-                onClick={() => openAddModal('enrollments', { name: '', email: '', grade: 'XII', whatsapp: '', instagram: '', subjects: [], feeStatus: 'Pending', totalFee: 1500, discount: 0, notes: '' })}
-                className="px-3 py-1 bg-[var(--primary)] text-white rounded-lg text-sm font-bold"
-              >
-                + Add Enrollment
-              </button>
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+              <div>
+                <h3 className="text-xl font-bold text-[var(--primary)]">Enrollments</h3>
+                <p className="text-xs opacity-50 mt-1 font-medium">Manage student batch listings and fee statuses</p>
+              </div>
+              <div className="flex items-center gap-3 w-full md:w-auto">
+                <div className="relative flex-1 md:w-64">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
+                  <input 
+                    type="text" 
+                    placeholder="Search students..." 
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="w-full pl-10 pr-4 py-2 bg-white/5 border border-white/10 rounded-xl focus:outline-none focus:border-[var(--primary)]/50 transition-all text-sm font-medium"
+                  />
+                </div>
+                <button 
+                  onClick={() => openAddModal('enrollments', { name: '', email: '', grade: 'XII', whatsapp: '', instagram: '', subjects: [], feeStatus: 'Pending', totalFee: 1500, discount: 0, notes: '' })}
+                  className="px-4 py-2 bg-[var(--primary)] text-white rounded-xl text-sm font-bold flex items-center gap-2 hover:opacity-90 active:scale-95 transition-all shadow-lg shadow-[var(--primary)]/20"
+                >
+                  <Plus size={18} />
+                  <span className="hidden sm:inline">Add Enrollment</span>
+                </button>
+              </div>
             </div>
             {['XII', 'XI', 'X'].map((grade, i) => {
-              const batchEnrollments = enrollments.filter(e => e.grade === grade);
+              const batchEnrollments = enrollments.filter(e => 
+                e.grade === grade && (
+                  (e.name || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+                  (e.email || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+                  (e.whatsapp || '').toLowerCase().includes(searchQuery.toLowerCase())
+                )
+              );
               if (batchEnrollments.length === 0) return null;
               return (
                 <div key={grade} className="border border-[var(--border-color)] rounded-xl overflow-hidden">
@@ -1776,17 +1828,22 @@ export default function TabAdmin({ branding }: { branding?: any }) {
                                 return (
                                   <div key={f.id} className="flex items-center justify-between p-2 rounded-xl bg-white/5 border border-white/5">
                                     <div className="flex items-center gap-2">
-                                      <div className="w-6 h-6 rounded-full bg-red-500/20 text-red-500 flex items-center justify-center text-[10px] font-bold">
+                                      <div className="w-10 h-10 rounded-full bg-red-500/20 text-red-500 flex items-center justify-center text-xs font-bold shrink-0">
                                         {facultyUser?.name?.charAt(0) || '?'}
                                       </div>
-                                      <div className="flex flex-col">
-                                        <span className="text-xs font-bold">{facultyUser?.name || 'Unknown User'}</span>
-                                        <span className="text-[9px] opacity-40">{facultyUser?.email}</span>
+                                      <div className="flex flex-col min-w-0">
+                                        <div className="flex items-center gap-2">
+                                          <span className="text-xs font-bold truncate">{facultyUser?.name || 'Unknown User'}</span>
+                                          {f.subject && (
+                                            <span className="text-[8px] px-1 bg-indigo-500/20 text-indigo-400 rounded font-black uppercase tracking-tighter shrink-0">{f.subject}</span>
+                                          )}
+                                        </div>
+                                        <span className="text-[9px] opacity-40 truncate">{facultyUser?.email}</span>
                                       </div>
                                     </div>
                                     <button 
                                       onClick={() => deleteItem('batchFaculty', f.id)}
-                                      className="p-1 px-2 text-[10px] bg-red-500/10 text-red-500 rounded-lg hover:bg-red-500/20 transition-all font-bold"
+                                      className="p-1 px-2 text-[10px] bg-red-500/10 text-red-500 rounded-lg hover:bg-red-500/20 transition-all font-bold shrink-0"
                                     >
                                       Revoke
                                     </button>
@@ -1800,20 +1857,38 @@ export default function TabAdmin({ branding }: { branding?: any }) {
                         </div>
 
                         {/* Assign Form */}
-                        <div className="mt-4 pt-4 border-t border-white/5">
-                          <select 
-                            className="w-full p-2.5 bg-white/5 border border-white/10 rounded-xl text-xs font-bold [&>option]:bg-white dark:[&>option]:bg-gray-900"
-                            onChange={async (e) => {
-                              const userId = e.target.value;
-                              if (!userId) return;
-                              
+                        <div className="mt-4 pt-4 border-t border-white/5 space-y-3">
+                          <div className="flex items-center gap-2">
+                            <select 
+                              id={`faculty-subject-${batch.id}`}
+                              className="flex-1 p-2 bg-white/10 border border-white/10 rounded-xl text-[10px] font-black uppercase outline-none focus:border-red-500/50"
+                            >
+                              <option value="ALL">All Subjects</option>
+                              <option value="PHYSICS">Physics</option>
+                              <option value="CHEMISTRY">Chemistry</option>
+                              <option value="MATHEMATICS">Mathematics</option>
+                              <option value="BIOLOGY">Biology</option>
+                            </select>
+                          </div>
+                          <SearchableUserDropdown 
+                            users={chatUsers}
+                            excludeUserIds={[
+                              ...chatUsers.filter(u => u.role === 'admin').map(u => u.id),
+                              ...activeFaculty.map(f => f.userId)
+                            ]}
+                            placeholder="+ Grant New Faculty Access..."
+                            onSelect={async (userId) => {
                               const targetUser = chatUsers.find(u => u.id === userId);
-                              if (window.confirm(`Grant Faculty access to ${targetUser?.name} for batch ${batch.name}?`)) {
+                              const subjectSelect = document.getElementById(`faculty-subject-${batch.id}`) as HTMLSelectElement;
+                              const selectedSubject = subjectSelect?.value || 'ALL';
+
+                              if (window.confirm(`Grant Faculty access (${selectedSubject}) to ${targetUser?.name} for batch ${batch.name}?`)) {
                                 await createItem('batchFaculty', {
                                   batchId: batch.id,
                                   batchName: batch.name,
                                   userId: userId,
                                   userEmail: targetUser?.email,
+                                  subject: selectedSubject,
                                   grantedAt: new Date().toISOString()
                                 });
                                 // Automatically upgrade role to Faculty if not admin
@@ -1822,18 +1897,8 @@ export default function TabAdmin({ branding }: { branding?: any }) {
                                 }
                                 toast.success('Faculty access granted');
                               }
-                              e.target.value = "";
                             }}
-                            value=""
-                          >
-                            <option value="">+ Grant New Faculty Access...</option>
-                            {chatUsers
-                              .filter(u => u.role !== 'admin' && !activeFaculty.some(f => f.userId === u.id))
-                              .map(u => (
-                                <option key={u.id} value={u.id}>{u.name} ({u.email})</option>
-                              ))
-                            }
-                          </select>
+                          />
                         </div>
                       </div>
                     );
@@ -1876,10 +1941,62 @@ export default function TabAdmin({ branding }: { branding?: any }) {
         )}
         {activeSection === 'verified' && (
           <div className="space-y-6">
-            <div className="flex justify-between items-center bg-green-500/10 p-4 rounded-2xl border border-green-500/20">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-green-500/10 p-5 rounded-3xl border border-green-500/20">
               <div>
                 <h3 className="text-xl font-bold text-green-600 dark:text-green-400">Verified Students</h3>
-                <p className="text-xs opacity-60">Displaying only students with 'Paid' fee status</p>
+                <p className="text-xs opacity-60 font-medium">Only students with 'Paid' fee status are listed here</p>
+              </div>
+              <div className="relative w-full sm:w-72">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-green-600/50" size={16} />
+                <input 
+                  type="text" 
+                  placeholder="Filter verified students..." 
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full pl-10 pr-4 py-2 bg-white/10 border border-green-500/20 rounded-xl focus:outline-none focus:border-green-500/50 transition-all text-sm font-medium placeholder:text-green-600/30"
+                />
+              </div>
+            </div>
+
+            <div className="flex flex-col md:flex-row gap-4">
+              <div className="flex-1 glass-card p-5 border-l-4 border-green-500">
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="w-10 h-10 rounded-full bg-green-500/20 text-green-600 flex items-center justify-center">
+                    <UserPlus size={20} />
+                  </div>
+                  <div>
+                    <h4 className="font-bold text-sm">Register Student Manually</h4>
+                    <p className="text-[10px] opacity-60">Grant batch access to an existing regular user</p>
+                  </div>
+                </div>
+                <SearchableUserDropdown 
+                  users={chatUsers}
+                  excludeUserIds={enrollments.map(e => e.userId).filter(Boolean) as string[]}
+                  placeholder="Select a registered user to verify..."
+                  onSelect={(userId) => {
+                    const targetUser = chatUsers.find(u => u.id === userId);
+                    if (targetUser) {
+                      openAddModal('enrollments', { 
+                        name: targetUser.name || '', 
+                        email: targetUser.email || '', 
+                        grade: 'XII', 
+                        whatsapp: targetUser.phone || '', 
+                        isManual: true,
+                        userId: targetUser.id,
+                        feeStatus: 'Paid'
+                      });
+                    }
+                  }}
+                />
+              </div>
+              <div className="flex-1 glass-card p-5 bg-indigo-500/5 border border-indigo-500/10">
+                 <div className="flex items-center gap-3 mb-2">
+                    <Shield size={20} className="text-indigo-500" />
+                    <h4 className="font-bold text-sm">Verification Policy</h4>
+                 </div>
+                 <p className="text-[10px] opacity-70 leading-relaxed">
+                   Verified students gain access to the <b>My Batch</b> tab. Access is automatically revoked once the <b>Expiry Date</b> is reached. Use the manual registration to upgrade active users.
+                 </p>
               </div>
             </div>
 
@@ -1894,7 +2011,13 @@ export default function TabAdmin({ branding }: { branding?: any }) {
                   </tr>
                 </thead>
                 <tbody>
-                  {enrollments.filter(s => s.feeStatus === 'Paid').map((student, i) => (
+                  {enrollments
+                    .filter(s => s.feeStatus === 'Paid')
+                    .filter(s => 
+                      (s.name || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+                      (s.email || '').toLowerCase().includes(searchQuery.toLowerCase())
+                    )
+                    .map((student, i) => (
                     <tr key={student.id || i} className="border-b border-[var(--border-color)] hover:bg-white/5 transition-colors">
                       <td className="p-3">
                         <div className="font-bold text-sm">{student.name}</div>
@@ -2218,6 +2341,20 @@ export default function TabAdmin({ branding }: { branding?: any }) {
                           setDownloads(downloads.map(d => d.id === dl.id ? {...d, links: newLinks} : d));
                         }} placeholder="URL (e.g. https://...)" disabled={link.url?.startsWith('data:')} />
                         
+                        <div className="flex items-center gap-2 px-2 bg-white/5 border border-[var(--border-color)] rounded h-[38px]">
+                          <Shield size={14} className={link.isProtected ? "text-indigo-500" : "opacity-30"} />
+                          <input 
+                            type="checkbox" 
+                            checked={link.isProtected || false} 
+                            onChange={e => {
+                              const newLinks = [...dl.links];
+                              newLinks[i].isProtected = e.target.checked;
+                              setDownloads(downloads.map(d => d.id === dl.id ? {...d, links: newLinks} : d));
+                            }} 
+                            title="Protect Media (Open in Viewer)"
+                          />
+                        </div>
+
                         {link.url?.startsWith('data:') ? (
                           <button type="button" onClick={() => {
                             const newLinks = [...dl.links];
